@@ -1462,10 +1462,9 @@ async function run() {
   // 9 dialogue: he talks, the camera creeps in
   const rolls = [0, -1.5, 1.2, -3, 0];
   const shotsFor = [null, 'face', 'hand', 'eyes', null];
-  for (let i = 0; i < msgs.length; i++) {
-    const last = i === msgs.length - 1;
+  for (let i = 0; i < msgs.length - 1; i++) {
     rollTarget = rolls[i];
-    dollyTarget += last ? 40 : 14;
+    dollyTarget += 14;
     if (i > 0) {
       slashBurst(2);
       sfxWord(sfxWords[i % sfxWords.length]);
@@ -1474,18 +1473,23 @@ async function run() {
     const sh = shotsFor[i];
     if (sh) await cutTo(sh, i === 1 ? 'slice' : 'hard');
     else if (curShot) await clearShot();
-    if (last) {
-      await impactFrame();
-      flash(500, '#fff', 0.8);
-      boom();
-      speedLines(900);
-      slashBurst(5);
-      emberBoost = 2.4;
-      faceZoom(1.45, 1500);
-    }
-    await say(msgs[i], last);
-    await wait(last ? 1800 : 1600);
+    await say(msgs[i], false);
+    await wait(1600);
   }
+
+  // straight from the last line into the birthday screen
+  await clearShot();
+  bubble.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' });
+  rollTarget = 0;
+  dollyTarget += 40;
+  await impactFrame();
+  flash(500, '#fff', 0.8);
+  boom();
+  speedLines(900);
+  slashBurst(5);
+  emberBoost = 2.4;
+  faceZoom(1.45, 1500);
+  await wait(500);
 
   // 10 finale
   await showFinale();
