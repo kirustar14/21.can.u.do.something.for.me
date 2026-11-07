@@ -421,36 +421,18 @@ const easeInOut = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
 
 /* ---------- audio (all synthesized) ---------- */
 /* ---------- the song: hidden YouTube player, starts on the first tap ---------- */
-const SONG_ID = 'mSVO8fZq70k', SONG_START = 0;
-let ytp = null, ytReady = false, songOn = false;
-(function () {
-  const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;left:-320px;top:0;width:200px;height:200px;opacity:0.01;pointer-events:none;z-index:-1;overflow:hidden';
-  const fr = document.createElement('iframe');
-  fr.id = 'ytf';
-  fr.width = 200; fr.height = 200;
-  fr.allow = 'autoplay; encrypted-media';
-  const org = location.protocol.indexOf('http') === 0 ? '&origin=' + encodeURIComponent(location.origin) : '';
-  fr.src = 'https://www.youtube.com/embed/' + SONG_ID + '?enablejsapi=1&playsinline=1&controls=0&disablekb=1&fs=0&rel=0&start=' + SONG_START + org;
-  box.appendChild(fr);
-  document.body.appendChild(box);
-  window.onYouTubeIframeAPIReady = () => {
-    try {
-      ytp = new YT.Player('ytf', { events: {
-        onReady: () => { ytReady = true; if (running) startSong(); },
-        onError: () => { songOn = false; }
-      } });
-    } catch (e) {}
-  };
-  const tag = document.createElement('script');
-  tag.src = 'https://www.youtube.com/iframe_api';
-  document.head.appendChild(tag);
-})();
+const songEl = new Audio('song.mp3');
+songEl.preload = 'auto'; songEl.loop = false; songEl.volume = 1;
+let songOn = false;
 function startSong() {
   if (songOn) return;
   try {
-    if (ytp && ytReady) { ytp.seekTo(SONG_START, true); ytp.setVolume(100); ytp.playVideo(); songOn = true; }
-  } catch (e) {}
+    songEl.currentTime = 0;
+    const p = songEl.play();
+    songOn = true;
+    if (p && p.catch) p.catch(() => { songOn = false; });
+    songEl.addEventListener('error', () => { songOn = false; }, { once: true });
+  } catch (e) { songOn = false; }
 }
 
 let ac = null, drone = null;
