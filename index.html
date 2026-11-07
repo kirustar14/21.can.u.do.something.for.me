@@ -420,6 +420,39 @@ const easeOut = k => 1 - Math.pow(1 - k, 3);
 const easeInOut = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
 
 /* ---------- audio (all synthesized) ---------- */
+/* ---------- the song: hidden YouTube player, starts on the first tap ---------- */
+const SONG_ID = 'mSVO8fZq70k', SONG_START = 0;
+let ytp = null, ytReady = false, songOn = false;
+(function () {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:-320px;top:0;width:200px;height:200px;opacity:0.01;pointer-events:none;z-index:-1;overflow:hidden';
+  const fr = document.createElement('iframe');
+  fr.id = 'ytf';
+  fr.width = 200; fr.height = 200;
+  fr.allow = 'autoplay; encrypted-media';
+  const org = location.protocol.indexOf('http') === 0 ? '&origin=' + encodeURIComponent(location.origin) : '';
+  fr.src = 'https://www.youtube.com/embed/' + SONG_ID + '?enablejsapi=1&playsinline=1&controls=0&disablekb=1&fs=0&rel=0&start=' + SONG_START + org;
+  box.appendChild(fr);
+  document.body.appendChild(box);
+  window.onYouTubeIframeAPIReady = () => {
+    try {
+      ytp = new YT.Player('ytf', { events: {
+        onReady: () => { ytReady = true; if (running) startSong(); },
+        onError: () => { songOn = false; }
+      } });
+    } catch (e) {}
+  };
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+})();
+function startSong() {
+  if (songOn) return;
+  try {
+    if (ytp && ytReady) { ytp.seekTo(SONG_START, true); ytp.setVolume(100); ytp.playVideo(); songOn = true; }
+  } catch (e) {}
+}
+
 let ac = null, drone = null;
 let keepEl = null;
 function silentWav() {
@@ -448,8 +481,10 @@ function initAudio() {
 }
 ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => addEventListener(ev, initAudio, { passive: true }));
 document.addEventListener('visibilitychange', () => { if (!document.hidden && ac && ac.state !== 'running') ac.resume(); });
+const SFX = 0.4;
 function tone(freq, dur, type, vol, slideTo) {
   if (!ac) return;
+  vol *= SFX;
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type;
   o.frequency.setValueAtTime(freq, ac.currentTime);
@@ -461,6 +496,7 @@ function tone(freq, dur, type, vol, slideTo) {
 }
 function noise(dur, vol, f0, f1) {
   if (!ac) return;
+  vol *= SFX;
   const len = Math.floor(ac.sampleRate * dur);
   const buf = ac.createBuffer(1, len, ac.sampleRate);
   const d = buf.getChannelData(0);
@@ -489,13 +525,13 @@ function voice() {
   o.frequency.setValueAtTime(rand(85, 125), ac.currentTime);
   f.type = 'bandpass'; f.frequency.value = rand(500, 1100); f.Q.value = 3;
   g.gain.setValueAtTime(0.0001, ac.currentTime);
-  g.gain.linearRampToValueAtTime(0.09, ac.currentTime + 0.015);
+  g.gain.linearRampToValueAtTime(0.09 * SFX, ac.currentTime + 0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.09);
   o.connect(f); f.connect(g); g.connect(ac.destination);
   o.start(); o.stop(ac.currentTime + 0.1);
 }
 function startDrone() {
-  if (!ac || drone) return;
+  if (!ac || drone || songOn) return;
   const o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
   o.type = 'sawtooth'; o.frequency.value = 55;
   o2.type = 'sawtooth'; o2.frequency.value = 55.7;
@@ -521,7 +557,7 @@ const chords = [[220, 261.63, 329.63], [261.63, 329.63, 392], [196, 246.94, 293.
 const bassN = [55, 65.41, 49, 43.65];
 let musTimer = null, musMode = 'soft', musStep = 0;
 function musicStart() {
-  if (!ac || musTimer) return;
+  if (!ac || musTimer || songOn) return;
   musStep = 0;
   musTimer = setInterval(() => {
     const s = musStep % 16, bar = Math.floor(musStep / 16) % 4, op = musMode === 'op';
@@ -1384,6 +1420,7 @@ async function run() {
   if (running) return;
   running = true;
   initAudio();
+  startSong();
   hint.style.display = 'none';
   document.querySelector('.eText').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
   rig.style.animation = 'none';
