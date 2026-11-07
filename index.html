@@ -364,7 +364,7 @@
   <div id="bug"><b>&#9679;</b> EP.21</div>
   <div id="bubble"><div id="bubbleIn"><div id="txt"></div></div></div>
 
-  <div id="hint">CLICK THE SEAL</div>
+  <div id="hint">CLICK THE SEAL · SOUND ON</div>
   <div id="slashes"></div>
   <div id="shards"></div>
 
@@ -421,10 +421,33 @@ const easeInOut = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2
 
 /* ---------- audio (all synthesized) ---------- */
 let ac = null, drone = null;
-function initAudio() {
-  if (ac) return;
-  try { ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) { ac = null; }
+let keepEl = null;
+function silentWav() {
+  const n = 4410, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 44100, true); v.setUint32(28, 88200, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
 }
+function initAudio() {
+  // iPhones mute web audio on silent mode unless a media element is playing, so keep a silent one going
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  try {
+    if (!keepEl) { keepEl = new Audio(silentWav()); keepEl.loop = true; keepEl.play().catch(() => {}); }
+  } catch (e) {}
+  if (ac) { if (ac.state !== 'running') ac.resume(); return; }
+  try {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state !== 'running') ac.resume();
+    const sb = ac.createBufferSource();
+    sb.buffer = ac.createBuffer(1, 1, 22050);
+    sb.connect(ac.destination);
+    sb.start(0);
+  } catch (e) { ac = null; }
+}
+['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => addEventListener(ev, initAudio, { passive: true }));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ac && ac.state !== 'running') ac.resume(); });
 function tone(freq, dur, type, vol, slideTo) {
   if (!ac) return;
   const o = ac.createOscillator(), g = ac.createGain();
@@ -1520,7 +1543,7 @@ if (location.search.indexOf('debug') > -1) {
   setTimeout(async () => { await showFinale(); await tail(1500); }, 400);
 }
 if (location.search.indexOf('auto') > -1) setTimeout(run, 400);
-if (matchMedia('(pointer: coarse)').matches) hint.textContent = 'TAP THE SEAL';
+if (matchMedia('(pointer: coarse)').matches) hint.textContent = 'TAP THE SEAL · SOUND ON';
 </script>
 </body>
 </html>
